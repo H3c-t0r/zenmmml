@@ -13,80 +13,33 @@
 #  permissions and limitations under the License.
 """Implementation of utils specific to the MLflow integration."""
 
-import mlflow
-from mlflow.entities import Run
-
-from zenml.client import Client
-from zenml.logger import get_logger
-
-logger = get_logger(__name__)
-
-ZENML_TAG_KEY = "zenml"
+from typing import Optional
 
 
-def get_missing_mlflow_experiment_tracker_error() -> ValueError:
-    """Returns description of how to add an MLflow experiment tracker to your stack.
-
-    Returns:
-        ValueError: If no MLflow experiment tracker is registered in the active stack.
-    """
-    return ValueError(
-        "The active stack needs to have a MLflow experiment tracker "
-        "component registered to be able to track experiments using "
-        "MLflow. You can create a new stack with a MLflow experiment "
-        "tracker component or update your existing stack to add this "
-        "component, e.g.:\n\n"
-        "  'zenml experiment-tracker register mlflow_tracker "
-        "--type=mlflow'\n"
-        "  'zenml stack register stack-name -e mlflow_tracker ...'\n"
-    )
-
-
-def get_tracking_uri() -> str:
-    """Gets the MLflow tracking URI from the active experiment tracking stack component.
-
-    # noqa: DAR401
-
-    Returns:
-        MLflow tracking URI.
-    """
-    from zenml.integrations.mlflow.experiment_trackers.mlflow_experiment_tracker import (
-        MLFlowExperimentTracker,
-    )
-
-    tracker = Client().active_stack.experiment_tracker
-    if tracker is None or not isinstance(tracker, MLFlowExperimentTracker):
-        raise get_missing_mlflow_experiment_tracker_error()
-
-    return tracker.get_tracking_uri()
-
-
-def is_zenml_run(run: Run) -> bool:
-    """Checks if a MLflow run is a ZenML run or not.
+def is_databricks_tracking_uri(tracking_uri: Optional[str]) -> bool:
+    """Checks whether the given tracking uri is a Databricks tracking uri.
 
     Args:
-        run: The run to check.
+        tracking_uri: The tracking uri to check.
 
     Returns:
-        If the run is a ZenML run.
+        `True` if the tracking uri is a Databricks tracking uri, `False`
+        otherwise.
     """
-    return ZENML_TAG_KEY in run.data.tags
+    return tracking_uri == "databricks"
 
 
-def stop_zenml_mlflow_runs(status: str) -> None:
-    """Stops active ZenML Mlflow runs.
-
-    This function stops all MLflow active runs until no active run exists or
-    a non-ZenML run is active.
+def is_remote_mlflow_tracking_uri(tracking_uri: Optional[str]) -> bool:
+    """Checks whether the given tracking uri is remote or not.
 
     Args:
-        status: The status to set the run to.
+        tracking_uri: The tracking uri to check.
+
+    Returns:
+        `True` if the tracking uri is remote, `False` otherwise.
     """
-    active_run = mlflow.active_run()
-    while active_run:
-        if is_zenml_run(active_run):
-            logger.debug("Stopping mlflow run %s.", active_run.info.run_id)
-            mlflow.end_run(status=status)
-            active_run = mlflow.active_run()
-        else:
-            break
+    if not tracking_uri:
+        return False
+    return any(
+        tracking_uri.startswith(prefix) for prefix in ["http://", "https://"]
+    ) or is_databricks_tracking_uri(tracking_uri)

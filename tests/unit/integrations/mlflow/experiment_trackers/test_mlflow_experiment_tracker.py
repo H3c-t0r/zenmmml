@@ -28,6 +28,12 @@ from zenml.integrations.gcp.flavors.gcp_artifact_store_flavor import (
     GCPArtifactStoreConfig,
 )
 from zenml.integrations.mlflow.experiment_trackers.mlflow_experiment_tracker import (
+    MLFlowExperimentTracker,
+)
+from zenml.integrations.mlflow.flavors.mlflow_experiment_tracker_flavor import (
+    MLFlowExperimentTrackerConfig,
+)
+from zenml.integrations.mlflow.mixins.mlflow_stack_component_mixin import (
     DATABRICKS_HOST,
     DATABRICKS_PASSWORD,
     DATABRICKS_TOKEN,
@@ -36,10 +42,6 @@ from zenml.integrations.mlflow.experiment_trackers.mlflow_experiment_tracker imp
     MLFLOW_TRACKING_PASSWORD,
     MLFLOW_TRACKING_TOKEN,
     MLFLOW_TRACKING_USERNAME,
-    MLFlowExperimentTracker,
-)
-from zenml.integrations.mlflow.flavors.mlflow_experiment_tracker_flavor import (
-    MLFlowExperimentTrackerConfig,
 )
 from zenml.orchestrators import LocalOrchestrator
 from zenml.stack import Stack
@@ -263,7 +265,7 @@ def test_mlflow_experiment_tracker_set_config(local_stack: Stack) -> None:
         updated=datetime.now(),
     )
 
-    local_stack._experiment_tracker.configure_mlflow()
+    local_stack._experiment_tracker._configure_mlflow()
 
     assert os.environ[MLFLOW_TRACKING_USERNAME] == "john_doe"
     assert os.environ[MLFLOW_TRACKING_PASSWORD] == "password"
@@ -288,7 +290,7 @@ def test_mlflow_experiment_tracker_set_config(local_stack: Stack) -> None:
         updated=datetime.now(),
     )
 
-    local_stack._experiment_tracker.configure_mlflow()
+    local_stack._experiment_tracker._configure_mlflow()
 
     assert os.environ[DATABRICKS_USERNAME] == "john_doe"
     assert os.environ[DATABRICKS_PASSWORD] == "password"

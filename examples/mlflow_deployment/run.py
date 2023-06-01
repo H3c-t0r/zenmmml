@@ -17,7 +17,7 @@ import click
 from pipelines import continuous_deployment_pipeline, inference_pipeline
 from rich import print
 
-from zenml.integrations.mlflow.mlflow_utils import get_tracking_uri
+from zenml.constants import METADATA_EXPERIMENT_TRACKER_URL
 from zenml.integrations.mlflow.model_deployers.mlflow_model_deployer import (
     MLFlowModelDeployer,
 )
@@ -66,21 +66,27 @@ def main(config: str, epochs: int, lr: float, min_accuracy: float):
             timeout=60,
         )
 
+        trainer_step = continuous_deployment_pipeline.get_runs()[0].get_step(
+            "tf_trainer"
+        )
+        tracking_uri = trainer_step.metadata[
+            METADATA_EXPERIMENT_TRACKER_URL
+        ].value
+        print(
+            "You can run:\n "
+            f"[italic green]    mlflow ui --backend-store-uri '{tracking_uri}"
+            "[/italic green]\n ...to inspect your experiment runs within the MLflow"
+            " UI.\nYou can find your runs tracked within the "
+            "`mlflow_example_pipeline` experiment. There you'll also be able to "
+            "compare two or more runs.\n\n"
+        )
+
     if predict:
         # Initialize an inference pipeline run
         inference_pipeline(
             pipeline_name="continuous_deployment_pipeline",
             pipeline_step_name="mlflow_model_deployer_step",
         )
-
-    print(
-        "You can run:\n "
-        f"[italic green]    mlflow ui --backend-store-uri '{get_tracking_uri()}"
-        "[/italic green]\n ...to inspect your experiment runs within the MLflow"
-        " UI.\nYou can find your runs tracked within the "
-        "`mlflow_example_pipeline` experiment. There you'll also be able to "
-        "compare two or more runs.\n\n"
-    )
 
     # fetch existing services with same pipeline name, step name and model name
     existing_services = mlflow_model_deployer_component.find_model_server(
