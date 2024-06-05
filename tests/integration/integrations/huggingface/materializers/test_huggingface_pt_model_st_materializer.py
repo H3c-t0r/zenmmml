@@ -12,22 +12,20 @@
 #  or implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-from torch.nn import Linear
+from transformers import RobertaConfig, RobertaModel
 
 from tests.unit.test_general import _test_materializer
-from zenml.integrations.pytorch.materializers.pytorch_module_materializer import (
-    PyTorchModuleMaterializer,
+from zenml.integrations.huggingface.materializers.huggingface_pt_model_st_materializer import (
+    HFPTModelSTMaterializer,
 )
 
 
-def test_pytorch_module_materializer(clean_client):
-    """Tests whether the steps work for the Pytorch Module materializer."""
-    module = _test_materializer(
-        step_output=Linear(20, 20),
-        materializer_class=PyTorchModuleMaterializer,
-        expected_metadata_size=3,
+def test_huggingface_pretrained_model_st_materializer(clean_client):
+    """Tests whether the steps work for the Huggingface Pretrained Model materializer using Safetensors."""
+    model = _test_materializer(
+        step_output=RobertaModel(RobertaConfig()),
+        materializer_class=HFPTModelSTMaterializer,
+        expected_metadata_size=5,
     )
 
-    assert module.in_features == 20
-    assert module.out_features == 20
-    assert module.bias is not None
+    assert model.config.model_type == "roberta"

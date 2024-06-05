@@ -12,7 +12,7 @@ A materializer dictates how a given artifact can be written to and retrieved fro
 
 ZenML already includes built-in materializers for many common data types. These are always enabled and are used in the background without requiring any user interaction / activation:
 
-<table data-full-width="true"><thead><tr><th>Materializer</th><th>Handled Data Types</th><th>Storage Format</th></tr></thead><tbody><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.built_in_materializer.BuiltInMaterializer">BuiltInMaterializer</a></td><td><code>bool</code>, <code>float</code>, <code>int</code>, <code>str</code>, <code>None</code></td><td><code>.json</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.built_in_materializer.BytesMaterializer">BytesInMaterializer</a></td><td><code>bytes</code></td><td><code>.txt</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.built_in_materializer.BuiltInContainerMaterializer">BuiltInContainerMaterializer</a></td><td><code>dict</code>, <code>list</code>, <code>set</code>, <code>tuple</code></td><td>Directory</td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.numpy_materializer.NumpyMaterializer">NumpyMaterializer</a></td><td><code>np.ndarray</code></td><td><code>.npy</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.pandas_materializer.PandasMaterializer">PandasMaterializer</a></td><td><code>pd.DataFrame</code>, <code>pd.Series</code></td><td><code>.csv</code> (or <code>.gzip</code> if <code>parquet</code> is installed)</td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.pydantic_materializer.PydanticMaterializer">PydanticMaterializer</a></td><td><code>pydantic.BaseModel</code></td><td><code>.json</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.service_materializer.ServiceMaterializer">ServiceMaterializer</a></td><td><code>zenml.services.service.BaseService</code></td><td><code>.json</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.structured_string_materializer.StructuredStringMaterializer">StructuredStringMaterializer</a></td><td><code>zenml.types.CSVString</code>, <code>zenml.types.HTMLString</code>, <code>zenml.types.MarkdownString</code></td><td><code>.csv</code> / <code>.html</code> / <code>.md</code> (depending on type)</td></tr></tbody></table>
+<table data-full-width="true"><thead><tr><th>Materializer</th><th>Handled Data Types</th><th>Storage Format</th></tr></thead><tbody><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.built_in_materializer.BuiltInMaterializer">BuiltInMaterializer</a></td><td><code>bool</code>, <code>float</code>, <code>int</code>, <code>str</code>, <code>None</code></td><td><code>.json</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.built_in_materializer.BytesMaterializer">BytesInMaterializer</a></td><td><code>bytes</code></td><td><code>.txt</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.built_in_materializer.BuiltInContainerMaterializer">BuiltInContainerMaterializer</a></td><td><code>dict</code>, <code>list</code>, <code>set</code>, <code>tuple</code></td><td>Directory</td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.numpy_materializer.NumpyMaterializer">NumpyMaterializer</a></td><td><code>np.ndarray</code></td><td><code>.npy</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.numpy_st_materializer.NumpySTMaterializer">NumpySTMaterializer</a></td><td><code>bool</code>, <code>float</code>, <code>int</code></td><td><code>.safetensors</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.pandas_materializer.PandasMaterializer">PandasMaterializer</a></td><td><code>pd.DataFrame</code>, <code>pd.Series</code></td><td><code>.csv</code> (or <code>.gzip</code> if <code>parquet</code> is installed)</td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.pydantic_materializer.PydanticMaterializer">PydanticMaterializer</a></td><td><code>pydantic.BaseModel</code></td><td><code>.json</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.service_materializer.ServiceMaterializer">ServiceMaterializer</a></td><td><code>zenml.services.service.BaseService</code></td><td><code>.json</code></td></tr><tr><td><a href="https://sdkdocs.zenml.io/latest/core_code_docs/core-materializers/#zenml.materializers.structured_string_materializer.StructuredStringMaterializer">StructuredStringMaterializer</a></td><td><code>zenml.types.CSVString</code>, <code>zenml.types.HTMLString</code>, <code>zenml.types.MarkdownString</code></td><td><code>.csv</code> / <code>.html</code> / <code>.md</code> (depending on type)</td></tr></tbody></table>
 
 {% hint style="warning" %}
 ZenML provides a built-in [CloudpickleMaterializer](https://sdkdocs.zenml.io/latest/core\_code\_docs/core-materializers/#zenml.materializers.cloudpickle\_materializer.CloudpickleMaterializer) that can handle any object by saving it with [cloudpickle](https://github.com/cloudpipe/cloudpickle). However, this is not production-ready because the resulting artifacts cannot be loaded when running with a different Python version. In such cases, you should consider building a [custom Materializer](handle-custom-data-types.md#custom-materializers) to save your objects in a more robust and efficient format.
@@ -30,7 +30,80 @@ In addition to the built-in materializers, ZenML also provides several integrati
 If you are running pipelines with a Docker-based [orchestrator](../../component-guide/orchestrators/orchestrators.md), you need to specify the corresponding integration as `required_integrations` in the `DockerSettings` of your pipeline in order to have the integration materializer available inside your Docker container. See the [pipeline configuration documentation](../pipelining-features/pipeline-settings.md) for more information.
 {% endhint %}
 
-## Custom materializers
+
+## Safetensor Materializers
+
+
+In addition to the standard integration-specific materializers that employ `Pickle` for serialization, opting for `Safetensors` offers a faster and more secure approach to model serialization. Further details on `Safetensors` can be found [here](https://huggingface.co/docs/safetensors/en/index).
+
+<table data-full-width="true"><thead><tr><th width="199.5">Integration</th><th width="271">Materializer</th><th width="390">Handled Data Types</th><th width="200">Storage Format</th></tr></thead><tbody><tr><td>huggingface</td><td><a href="https://sdkdocs.zenml.io/latest/integration_code_docs/integrations-huggingface/#zenml.integrations.huggingface.materializers.huggingface_pt_model_st_materializer.HFPTModelSTMaterializer">HFPTModelSTMaterializer</a></td><td><code>transformers.PreTrainedModel</code></td><td><code>.safetensors</code></td></tr><tr><td>pytorch</td><td><a href="https://sdkdocs.zenml.io/latest/integration_code_docs/integrations-pytorch/#zenml.integrations.pytorch.materializers.pytorch_module_st_materializer.PyTorchModuleSTMaterializer">PyTorchModuleSTMaterializer</a></td><td><code>torch.Module</code></td><td><code>.safetensors</code></td></tr><tr><td>pytorch_lightning</td><td><a href="https://sdkdocs.zenml.io/latest/integration_code_docs/integrations-pytorch_lightning/#zenml.integrations.pytorch_lightning.materializers.pytorch_lightning_st_materializer.PyTorchLightningSTMaterializer">PyTorchLightningSTMaterializer</a></td><td><code>torch.Module</code></td><td><code>.safetensors</code></td></tr></tbody></table>
+
+### Here's an example showing how to use `PyTorchModuleSTMaterializer`:
+
+
+Let's see how materialization using safetensors works with a basic example. Here we will use `resnet50` from pytorch to test the functionality:
+
+
+Create `pipeline` which includes steps to `save` and `load` model.
+
+
+``` python
+import logging
+
+from torch.nn import Module
+
+from zenml import step, pipeline
+from zenml.integrations.pytorch.materializers import PyTorchModuleSTMaterializer
+
+
+@step(enable_cache=False, output_materializers=PyTorchModuleSTMaterializer)
+def my_first_step() -> Module:
+    """Step that saves a Pytorch model"""
+    from torchvision.models import resnet50
+
+    pretrained_model = resnet50()
+
+    return pretrained_model
+
+
+@step(enable_cache=False)
+def my_second_step(model: Module):
+    """Step that loads the model."""
+    logging.info("Model loaded correctly.")
+
+
+@pipeline
+def first_pipeline():
+    model = my_first_step()
+    my_second_step(model)
+
+
+if __name__ == "__main__":
+    first_pipeline()
+```
+
+By running pipeline it will yield the following output:
+
+```python
+Initiating a new run for the pipeline: first_pipeline.
+Reusing registered pipeline version: (version: 3).
+Executing a new run.
+Using user: default
+Using stack: default
+  orchestrator: default
+  artifact_store: default
+You can visualize your pipeline runs in the ZenML Dashboard. In order to try it locally, please run zenml up.
+Caching disabled explicitly for my_first_step.
+Step my_first_step has started.
+Step my_first_step has finished in 1.159s.
+Caching disabled explicitly for my_second_step.
+Step my_second_step has started.
+Model loaded correctly.
+Step my_second_step has finished in 0.061s.
+Pipeline run has finished in 1.266s.
+```
+
+## Custom Materializers
 
 ### Configuring a step/pipeline to use a custom materializer
 

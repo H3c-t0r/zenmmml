@@ -59,7 +59,7 @@ def _test_materializer(
             file exists or a certain number of files were written.
         expected_metadata_size: If provided, we assert that the metadata dict
             returned by `materializer.extract_full_metadata()` has this size.
-        return_metadata: If True, we return the metadata dict returned by
+        return_metadata: If `True`, we return the metadata dict returned by
             `materializer.extract_full_metadata()`.
         assert_data_exists: If `True`, we also assert that `materializer.save()`
             wrote something to disk.

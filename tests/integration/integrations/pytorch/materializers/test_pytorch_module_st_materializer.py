@@ -15,16 +15,16 @@
 from torch.nn import Linear
 
 from tests.unit.test_general import _test_materializer
-from zenml.integrations.pytorch.materializers.pytorch_module_materializer import (
-    PyTorchModuleMaterializer,
+from zenml.integrations.pytorch.materializers.pytorch_module_st_materializer import (
+    PyTorchModuleSTMaterializer,
 )
 
 
-def test_pytorch_module_materializer(clean_client):
-    """Tests whether the steps work for the Pytorch Module materializer."""
+def test_pytorch_module_st_materializer(clean_client):
+    """Tests whether the steps work for the PyTorch Module materializer using Safetensors."""
     module = _test_materializer(
         step_output=Linear(20, 20),
-        materializer_class=PyTorchModuleMaterializer,
+        materializer_class=PyTorchModuleSTMaterializer,
         expected_metadata_size=3,
     )
 
