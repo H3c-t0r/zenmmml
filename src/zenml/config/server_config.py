@@ -228,6 +228,7 @@ class ServerConfiguration(BaseModel):
         auto_activate: Whether to automatically activate the server and create a
             default admin user account with an empty password during the initial
             deployment.
+        assistant_enabled: Whether to include the AI assistant endpoints.
     """
 
     deployment_type: ServerDeploymentType = ServerDeploymentType.OTHER
@@ -308,6 +309,8 @@ class ServerConfiguration(BaseModel):
         union_mode="left_to_right",
     )
     use_legacy_dashboard: bool = DEFAULT_ZENML_SERVER_USE_LEGACY_DASHBOARD
+
+    assistant_enabled: bool = False
 
     server_name: str = DEFAULT_ZENML_SERVER_NAME
     display_announcements: bool = True
