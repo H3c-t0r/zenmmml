@@ -31,7 +31,7 @@ install_zenml() {
     uv pip install $PIP_ARGS -e ".[server,templates,terraform,secrets-aws,secrets-gcp,secrets-azure,secrets-hashicorp,s3fs,gcsfs,adlfs,dev]"
 
     # TODO: Remove. Temporary installation from the upgrade branch.
-    uv pip install $PIP_ARGS git+https://github.com/zenml-io/mlstacks.git@develop
+    uv pip install $PIP_ARGS git+https://github.com/zenml-io/mlstacks.git@feature/upgrade-to-python-3.12
 }
 
 install_integrations() {
@@ -39,7 +39,7 @@ install_integrations() {
     # figure out the python version
     python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
 
-    ignore_integrations="feast label_studio bentoml seldon pycaret skypilot_aws skypilot_gcp skypilot_azure pigeon prodigy"
+    ignore_integrations="feast label_studio bentoml seldon pycaret skypilot_aws skypilot_gcp pigeon prodigy"
     
     # turn the ignore integrations into a list of --ignore-integration args
     ignore_integrations_args=""
