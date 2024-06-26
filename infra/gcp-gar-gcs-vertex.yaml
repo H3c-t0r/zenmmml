@@ -1,5 +1,3 @@
-# Access at: https://console.cloud.google.com/dm/deployments/new?templateUrl=https://zenml-cf-templates.s3.eu-central-1.amazonaws.com/gcp-gar-gcs-vertex.yaml
-
 resources:
 - name: zenml-service-account
   type: iam.v1.serviceAccount
@@ -8,10 +6,9 @@ resources:
     displayName: ZenML Service Account
 
 - name: zenml-service-account-key
-  type: gcp-types/iam-v1:projects.serviceAccounts.keys.create
+  type: iam.v1.serviceAccounts.key
   properties:
-    name: "projects/${project}/serviceAccounts/$(ref.zenml-service-account.email)"
-    privateKeyType: TYPE_GOOGLE_CREDENTIALS_FILE
+    parent: $(ref.iam-account.name) 
 
 - name: zenml-gcs-bucket
   type: storage.v1.bucket

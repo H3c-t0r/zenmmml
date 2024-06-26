@@ -7,5 +7,5 @@ This script will deploy the ZenML stack to your GCP project.
 2. Run the following command to deploy the stack:
 
 ```sh
-gcloud deployment-manager deployments create zenml-deployment --config config.yaml
+gcloud deployment-manager deployments create zenml-gcp-stack --template gcp-gar-gcs-vertex.yaml
 ```
