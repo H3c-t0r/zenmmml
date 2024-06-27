@@ -6,7 +6,7 @@ These are a set of scripts that can be used to provision infrastructure for ZenM
 
 Click the button below to deploy the ZenML stack in your AWS account using AWS Cloud Formation. Login to AWS and follow the instructions in the Cloud Formation console to deploy the stack.
 
-[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/create/review?stackName=zenml-stack&templateURL=https://raw.githubusercontent.com/zenml-io/zenml/feature/prd-482-one-click-stacks/infra/aws-ecr-s3-sagemaker.yaml)
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/create/review?stackName=zenml-stack&templateURL=https://zenml-cf-templates.s3.eu-central-1.amazonaws.com/aws-ecr-s3-sagemaker.yaml)
 
 
 ## Deploy ZenML Stack on GCP
