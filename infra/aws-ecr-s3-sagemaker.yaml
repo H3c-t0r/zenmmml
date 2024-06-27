@@ -14,24 +14,32 @@ Description: |
 Parameters:
   ResourceNameSuffix:
     Type: String
-    Description: Unique random suffix to use for the name of all resources
-    MinLength: 1
+    Description: |
+      Unique random suffix to use for the name of all resources. Can include
+      alphanumeric characters and hyphens and must be between 6-15 characters
+      in length.
+    MinLength: 6
     MaxLength: 15
     AllowedPattern: "[a-zA-Z0-9-]+"
-    ConstraintDescription: "Must be a valid alphanumeric string with no spaces"
-    Default: "001"
-
-# TODO: OPTIONAL
+    ConstraintDescription: |
+      Must be 6-15 characters in length containing only alphanumeric characters
+      and hyphens.
 
   ZenMLServerURL:
     Type: String
-    Description: ZenML Server URL
+    Description: |
+      URL to the ZenML Server where the stack will be registered. If not
+      provided, the stack will not be registered.
     AllowedPattern: "^https?://.*"
-    ConstraintDescription: "Must be a valid URL starting with http:// or https://"
+    ConstraintDescription: Must be a valid URL starting with http:// or https://
+    Default: ""
 
   ZenMLServerAPIToken:
     Type: String
-    Description: ZenML Server API token
+    Description: |
+      API token to use to authenticate with the ZenML Server. If not provided,
+      the stack will not be registered.
+    Default: ""
 
   TagName:
     Type: String
@@ -42,6 +50,11 @@ Parameters:
     Type: String
     Description: "The value of the tag to apply to all resources"
     Default: "zenml"
+
+Conditions:
+  RegisterZenMLStack: !And
+    - !Not [ !Equals [ !Ref ZenMLServerURL, "" ] ]
+    - !Not [ !Equals [ !Ref ZenMLServerAPIToken, "" ] ]
 
 Resources:
   S3Bucket:
@@ -141,6 +154,7 @@ Resources:
           
   InvokeZenMLAPIFunction:
     Type: AWS::Serverless::Function
+    Condition: RegisterZenMLStack
     Properties:
       Handler: index.handler
       Runtime: python3.8
@@ -221,16 +235,17 @@ Resources:
 
   InvokeZenMLAPICustomResource:
     Type: Custom::Resource
+    Condition: RegisterZenMLStack
     Properties:
       ServiceToken: !GetAtt InvokeZenMLAPIFunction.Arn
       ServiceTimeout: 300
       Payload: !Sub |
             {
-              "name": "aws-${ResourceNameSuffix}",
-              "description": "Basic AWS stack",
+              "name": "aws-${AWS::StackName}",
+              "description": "AWS stack deployed by CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region."
               "service-connectors": [
                 {
-                  "name": "aws-${ResourceNameSuffix}",
+                  "name": "aws-${AWS::StackName}",
                   "type": "aws",
                   "auth-method": "iam-role",
                   "aws_access_key_id": "${IAMUserAccessKey}",
@@ -241,25 +256,25 @@ Resources:
               ],
               "components": [
                 {
-                  "name": "s3-${ResourceNameSuffix}",
+                  "name": "s3-${AWS::StackName}",
                   "type": "artifact-store",
                   "flavor": "s3",
                   "path": "s3://${S3Bucket}",
-                  "connector": "aws"
+                  "connector": "aws-${AWS::StackName}"
                 },
                 {
-                  "name": "ecr-${ResourceNameSuffix}",
+                  "name": "ecr-${AWS::StackName}",
                   "type": "container-registry",
                   "flavor": "aws",
                   "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
-                  "connector": "aws"
+                  "connector": "aws-${AWS::StackName}"
                 },
                 {
-                  "name": "sagemaker-${ResourceNameSuffix}",
+                  "name": "sagemaker-${AWS::StackName}",
                   "type": "orchestrator",
                   "flavor": "sagemaker",
                   "execution_role": "${StackAccessRole.Arn}",
-                  "connector": "aws"
+                  "connector": "aws-${AWS::StackName}"
                 }
               ]
             }
@@ -268,23 +283,57 @@ Outputs:
   AWSRegion:
     Description: "AWS Region"
     Value: !Ref AWS::Region
-    Export:
-      Name: !Sub '${ResourceNameSuffix}-AWSRegion'
 
   AWSAccessKeyID:
     Description: "AWS Access Key ID"
     Value: !Ref IAMUserAccessKey
-    Export:
-      Name: !Sub '${ResourceNameSuffix}-AWSAccessKeyID'
 
   AWSSecretAccessKey:
     Description: "AWS Secret Access Key"
     Value: !GetAtt IAMUserAccessKey.SecretAccessKey
-    Export:
-      Name: !Sub '${ResourceNameSuffix}-AWSSecretAccessKey'
 
   IAMRoleARN:
     Description: "IAM Role ARN"
     Value: !GetAtt StackAccessRole.Arn
-    Export:
-      Name: !Sub '${ResourceNameSuffix}-IAMRoleARN'
+
+  ZenMLStack:
+    Description: "ZenML Stack JSON (can be imported with `zenml stack import`)"
+    Value: !Sub |
+      {
+        "name": "aws-${AWS::StackName}",
+        "description": "AWS stack deployed by CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region."
+        "service-connectors": [
+          {
+            "name": "aws-${AWS::StackName}",
+            "type": "aws",
+            "auth-method": "iam-role",
+            "aws_access_key_id": "${IAMUserAccessKey}",
+            "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
+            "iam_role": "${StackAccessRole.Arn}"
+            "region": "${AWS::Region}"
+          }
+        ],
+        "components": [
+          {
+            "name": "s3-${AWS::StackName}",
+            "type": "artifact-store",
+            "flavor": "s3",
+            "path": "s3://${S3Bucket}",
+            "connector": "aws-${AWS::StackName}"
+          },
+          {
+            "name": "ecr-${AWS::StackName}",
+            "type": "container-registry",
+            "flavor": "aws",
+            "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
+            "connector": "aws-${AWS::StackName}"
+          },
+          {
+            "name": "sagemaker-${AWS::StackName}",
+            "type": "orchestrator",
+            "flavor": "sagemaker",
+            "execution_role": "${StackAccessRole.Arn}",
+            "connector": "aws-${AWS::StackName}"
+          }
+        ]
+      }

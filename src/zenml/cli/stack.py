@@ -17,6 +17,7 @@ import getpass
 import os
 import re
 import time
+import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 from uuid import UUID
@@ -1619,34 +1620,41 @@ def deploy(
         )
 
         console.print(Markdown(deployment.description()))
+        console.print(Markdown(deployment.deploy_instructions()))
 
-        while option := click.prompt(
-            "Proceed with the stack deployment (y|n) or display detailed information (i) ?",
-            type=click.Choice(["y", "n", "i"]),
-            default="y",
+        if not cli_utils.confirmation(
+            "\n\nProceed to continue with the deployment. You will be "
+            f"automatically redirected to {provider.upper()} in your browser.",
         ):
-            if option == "y":
-                break
-            elif option == "n":
-                return
-            elif option == "i":
-                console.print(Markdown(deployment.deploy_instructions()))
+            raise click.Abort()
 
+        deployment_url, deployment_url_title = deployment.deploy_url()
+        webbrowser.open(deployment_url)
         console.print(
             Markdown(
-                f"[Click here to deploy the stack to {provider.upper()}]({deployment.deploy_url()})."
+                f"If your browser did not open automatically, please open "
+                f"the following URL into your browser to deploy the stack to "
+                f"{provider.upper()}: "
+                f"[{deployment_url_title}]({deployment_url}).\n\n"
             )
         )
 
         try:
             with console.status(
-                "Waiting for the stack to be registered. Press CTRL+C to abort...\n"
+                "Waiting for the deployment to complete and the stack to be "
+                "registered. Press CTRL+C to abort...\n"
             ):
                 while True:
                     stack = deployment.get_stack()
                     if stack:
                         break
                     time.sleep(5)
+
+                analytics_handler.metadata.update(
+                    {
+                        "stack_id": stack.id,
+                    }
+                )
 
                 console.print(
                     Markdown(
@@ -1671,7 +1679,7 @@ def deploy(
                     cancelled=True,
                 )
             )
-            return
+            raise
 
 
 @stack.command(help="Deploy a stack using mlstacks.")

@@ -14,9 +14,8 @@
 """Functionality to deploy a ZenML stack to a cloud provider."""
 
 import datetime
-import urllib.parse
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -59,7 +58,7 @@ class ZenMLCloudStackDeployment(BaseModel):
         """
 
     @abstractmethod
-    def deploy_url(self) -> str:
+    def deploy_url(self) -> Tuple[str, str]:
         """Return the URL to deploy the ZenML stack to the specified cloud provider.
 
         The URL should point to a cloud provider console where the user can
@@ -67,7 +66,8 @@ class ZenMLCloudStackDeployment(BaseModel):
         as possible.
 
         Returns:
-            The URL to deploy the ZenML stack to the specified cloud provider.
+            The URL to deploy the ZenML stack to the specified cloud provider
+            and a text description of the URL.
         """
 
     @abstractmethod
@@ -119,6 +119,8 @@ class AWSZenMLCloudStackDeployment(ZenMLCloudStackDeployment):
             A description of the ZenML Cloud Stack Deployment.
         """
         return """
+# AWS ZenML Cloud Stack Deployment
+
 Provision and register a basic AWS ZenML stack authenticated and connected to
 all the necessary cloud infrastructure resources required to run pipelines in
 AWS.
@@ -135,12 +137,19 @@ AWS.
             provider.
         """
         return """
-Clicking on the link below will take you to the AWS console where you'll be
-asked to log into your AWS account and provision a CloudFormation ZenML stack.
+## Instructions
 
-**NOTE**: this stack will create the following new resources in your AWS
-account. Please ensure you have the necessary permissions and are aware of any
-potential costs:
+You will be redirected to the AWS console in your browser where you'll be asked
+to log into your AWS account and create a CloudFormation ZenML stack. The stack
+parameters will be pre-filled with the necessary information to connect ZenML to
+your AWS account, so you should only need to review and confirm the stack.
+
+After the CloudFormation stack is deployed, you can return to the CLI to view
+details about the associated ZenML stack automatically registered with ZenML.
+
+**NOTE**: The CloudFormation stack will create the following new resources in
+your AWS account. Please ensure you have the necessary permissions and are aware
+of any potential costs:
 
 - An S3 bucket to store pipeline artifacts.
 - An ECR repository to store pipeline Docker images.
@@ -148,13 +157,13 @@ potential costs:
 - An IAM user, IAM role and AWS access key with the minimum necessary
 permissions to access the above resources to run pipelines.
 
-The CloudFormation stack will automatically create an AWS secret key that
-will be shared with ZenML to give it permissions to access the resources created
+The CloudFormation stack will automatically create an AWS secret key and
+will share it with ZenML to give it permissions to access the resources created
 by the stack. You can revoke these permissions at any time by deleting the
 CloudFormation stack.
 """
 
-    def deploy_url(self) -> str:
+    def deploy_url(self) -> Tuple[str, str]:
         """Return the URL to deploy the ZenML stack to the specified cloud provider.
 
         The URL should point to a cloud provider console where the user can
@@ -162,7 +171,8 @@ CloudFormation stack.
         as possible.
 
         Returns:
-            The URL to deploy the ZenML stack to the specified cloud provider.
+            The URL to deploy the ZenML stack to the specified cloud provider
+            and a text description of the URL.
         """
         client = Client()
         assert isinstance(client.zen_store, RestZenStore)
@@ -172,18 +182,17 @@ CloudFormation stack.
         params = dict(
             stackName=self.stack_name,
             templateURL="https://zenml-cf-templates.s3.eu-central-1.amazonaws.com/aws-ecr-s3-sagemaker.yaml",
-            ResourceNameSuffix=random_str(6).lower(),
-            ZenMLServerURL=client.zen_store.config.url,
-            ZenMLServerAPIToken=api_token,
+            param_ResourceNameSuffix=random_str(6),
+            param_ZenMLServerURL=client.zen_store.config.url,
+            param_ZenMLServerAPIToken=api_token,
         )
         # Encode the parameters as URL query parameters
-        query_params = "&".join(
-            [urllib.parse.quote_plus(f"{k}={v}") for k, v in params.items()]
-        )
+        query_params = "&".join([f"{k}={v}" for k, v in params.items()])
 
         return (
             f"https://console.aws.amazon.com/cloudformation/home?"
-            f"region=eu-central-1#/stacks/create/review?{query_params}"
+            f"region=eu-central-1#/stacks/create/review?{query_params}",
+            "AWS CloudFormation Console",
         )
 
     def get_stack(self) -> Optional[StackResponse]:
@@ -207,8 +216,9 @@ CloudFormation stack.
         # that was registered after this deployment was created.
 
         # Get all recent stacks
+        # remove milliseconds from the date
         stacks = client.list_stacks(
-            created=f"gt:{self.date_start.isoformat()}",
+            created=f"gt:{str(self.date_start.replace(microsecond=0))}",
             size=50,
         )
 
@@ -282,11 +292,15 @@ CloudFormation stack.
         """
         if not cancelled:
             return """
+## Follow-up
+
 The ZenML stack has been successfully deployed and registered. You can delete
 the CloudFormation at any time to revoke ZenML's access to your AWS account and
 to clean up the resources created by the stack by using the AWS CloudFormation
 console.
+
 """
+        return ""
 
 
 STACK_DEPLOYMENT_PROVIDERS = {
