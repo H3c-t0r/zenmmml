@@ -1,4 +1,4 @@
-# Access at: https://console.aws.amazon.com/cloudformation/home?#/stacks/create/review?stackName=zenml-aws-stack&templateURL=https://zenml-cf-templates.s3.eu-central-1.amazonaws.com/aws-ecr-s3-sagemaker.yaml
+# Access at: https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/create/review?stackName=zenml-stack&templateURL=https://raw.githubusercontent.com/zenml-io/zenml/main/infra/aws-ecr-s3-sagemaker.yaml
 
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
@@ -14,26 +14,27 @@ Description: |
 Parameters:
   ResourceNameSuffix:
     Type: String
-    Description: Suffix to use for the name of all resources
+    Description: Unique random suffix to use for the name of all resources
     MinLength: 1
     MaxLength: 15
     AllowedPattern: "[a-zA-Z0-9-]+"
     ConstraintDescription: "Must be a valid alphanumeric string with no spaces"
+    Default: "001"
 
   ZenMLServerURL:
     Type: String
-    Description: "URL of the ZenML Server"
+    Description: ZenML Server URL
     AllowedPattern: "^https?://.*"
     ConstraintDescription: "Must be a valid URL starting with http:// or https://"
 
   ZenMLServerAPIToken:
     Type: String
-    Description: "API token for ZenML Server"
+    Description: ZenML Server API token
     NoEcho: true  # This hides the parameter value from the AWS console and CLI
 
   TagName:
     Type: String
-    Description: "The name of the tag to apply to all resources"
+    Description: "The name of a tag to apply to all resources"
     Default: "project"
 
   TagValue:
@@ -45,7 +46,7 @@ Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'zenml-${ResourceNameSuffix}'
+      BucketName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
       AccessControl: Private
       Tags:
         - Key: !Ref TagName
@@ -54,15 +55,15 @@ Resources:
   ECRRegistry:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: !Sub 'zenml-${ResourceNameSuffix}'
+      RepositoryName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
       Tags:
         - Key: !Ref TagName
-          Value: !Ref TagValue
+          Value: !Sub TagValue
           
   IAMUser:
     Type: AWS::IAM::User
     Properties:
-      UserName: !Sub 'zenml-${ResourceNameSuffix}'
+      UserName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
       Policies:
         - PolicyName: AssumeRole
           PolicyDocument: 
@@ -85,13 +86,13 @@ Resources:
     Type: AWS::IAM::Role
     DependsOn: IAMUser
     Properties:
-      RoleName: !Sub 'zenml-${ResourceNameSuffix}'
+      RoleName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/zenml-${ResourceNameSuffix}'
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/${AWS::StackName}${ResourceNameSuffix}'
             Action: 'sts:AssumeRole'
           - Effect: Allow
             Principal:
@@ -109,8 +110,8 @@ Resources:
                   - 's3:PutObject'
                   - 's3:DeleteObject'
                 Resource:
-                  - !Sub 'arn:aws:s3:::zenml-${ResourceNameSuffix}/*'
-                  - !Sub 'arn:aws:s3:::zenml-${ResourceNameSuffix}'
+                  - !Sub 'arn:aws:s3:::${AWS::StackName}${ResourceNameSuffix}/*'
+                  - !Sub 'arn:aws:s3:::${AWS::StackName}${ResourceNameSuffix}'
         - PolicyName: ECRPolicy
           PolicyDocument:
             Version: '2012-10-17'
@@ -128,7 +129,7 @@ Resources:
                   - 'ecr:UploadLayerPart'
                   - 'ecr:CompleteLayerUpload'
                   - 'ecr:PutImage'
-                Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/zenml-${ResourceNameSuffix}'
+                Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${AWS::StackName}${ResourceNameSuffix}'
         - PolicyName: SageMakerPolicy
           PolicyDocument:
             Version: '2012-10-17'
@@ -224,11 +225,11 @@ Resources:
       ServiceTimeout: 300
       Payload: !Sub |
             {
-              "name": "aws",
+              "name": "aws-${ResourceNameSuffix}",
               "description": "Basic AWS stack",
               "service-connectors": [
                 {
-                  "name": "aws",
+                  "name": "aws-${ResourceNameSuffix}",
                   "type": "aws",
                   "auth-method": "iam-role",
                   "aws_access_key_id": "${IAMUserAccessKey}",
@@ -239,21 +240,21 @@ Resources:
               ],
               "components": [
                 {
-                  "name": "s3",
+                  "name": "s3-${ResourceNameSuffix}",
                   "type": "artifact-store",
                   "flavor": "s3",
                   "path": "s3://${S3Bucket}",
                   "connector": "aws"
                 },
                 {
-                  "name": "ecr",
+                  "name": "ecr-${ResourceNameSuffix}",
                   "type": "container-registry",
                   "flavor": "aws",
                   "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
                   "connector": "aws"
                 },
                 {
-                  "name": "sagemaker",
+                  "name": "sagemaker-${ResourceNameSuffix}",
                   "type": "orchestrator",
                   "flavor": "sagemaker",
                   "execution_role": "${StackAccessRole.Arn}",
