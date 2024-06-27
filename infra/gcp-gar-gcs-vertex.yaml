@@ -1,93 +1,128 @@
 resources:
-- name: zenml-service-account
-  type: iam.v1.serviceAccount
-  properties:
-    accountId: "zenml-${resourceNameSuffix}"
-    displayName: ZenML Service Account
+  - name: zenml-service-account
+    type: iam.v1.serviceAccount
+    properties:
+      accountId: "zenml-${resourceNameSuffix}"
+      displayName: ZenML Service Account
 
-- name: zenml-service-account-key
-  type: iam.v1.serviceAccounts.key
-  properties:
-    parent: $(ref.iam-account.name) 
+  - name: zenml-service-account-key
+    type: iam.v1.serviceAccounts.key
+    properties:
+      parent: $(ref.iam-account.name) 
 
-- name: zenml-gcs-bucket
-  type: storage.v1.bucket
-  properties:
-    name: "zenml-${resourceNameSuffix}"
-    location: ${region}
+  - name: zenml-gcs-bucket
+    type: storage.v1.bucket
+    properties:
+      name: "zenml-${resourceNameSuffix}"
+      # location: ${region}
 
-- name: zenml-artifact-registry
-  type: gcp-types/artifactregistry-v1beta1:projects.locations.repositories
-  properties:
-    parent: "projects/${project}/locations/${region}"
-    repositoryId: "zenml-${resourceNameSuffix}"
-    repository:
-      description: ZenML Artifact Registry
-      format: DOCKER
+  - name: zenml-artifact-registry
+    type: gcp-types/artifactregistry-v1beta1:projects.locations.repositories
+    properties:
+      parent: "projects/${project}/locations/${region}"
+      repositoryId: "zenml-${resourceNameSuffix}"
+      repository:
+        description: ZenML Artifact Registry
+        format: DOCKER
 
-- name: zenml-cloud-function
-  type: gcp-types/cloudfunctions-v1:projects.locations.functions
-  properties:
-    parent: "projects/${project}/locations/${region}"
-    function:
-      name: zenmlInvokeAPIFunction
-      entryPoint: handler
-      runtime: python310
-      timeout: 60s
-      availableMemoryMb: 512
-      environmentVariables:
-        ZENML_SERVER_URL: ${zenmlServerURL}
-        ZENML_SERVER_API_TOKEN: ${zenmlServerAPIToken}
-      sourceArchiveUrl: "gs://${artifactBucket}/functions/zenmlInvokeAPIFunction.zip"
+  - name: zenml-cloud-function
+    type: gcp-types/cloudfunctions-v1:projects.locations.functions
+    properties:
+      parent: "projects/${project}/locations/${region}"
+      function:
+        name: zenmlInvokeAPIFunction
+        entryPoint: handler
+        runtime: python310
+        timeout: 60s
+        availableMemoryMb: 512
+        environmentVariables:
+          ZENML_SERVER_URL: ${zenmlServerURL}
+          ZENML_SERVER_API_TOKEN: ${zenmlServerAPIToken}
+        sourceArchiveUrl: "gs://${artifactBucket}/functions/zenmlInvokeAPIFunction.zip"
 
-- name: zenml-cloud-function-invoker
-  type: gcp-types/cloudfunctions-v1:projects.locations.functions.setIamPolicy
-  properties:
-    resource: "projects/${project}/locations/${region}/functions/zenmlInvokeAPIFunction"
-    policy:
+  - name: zenml-cloud-function-invoker
+    type: gcp-types/cloudfunctions-v1:projects.locations.functions.setIamPolicy
+    properties:
+      resource: "projects/${project}/locations/${region}/functions/zenmlInvokeAPIFunction"
+      policy:
+        bindings:
+        - role: roles/cloudfunctions.invoker
+          members:
+          - serviceAccount: $(ref.zenml-service-account.email)
+
+  - name: custom-role
+    type: gcp-types/iam-v1:projects.roles
+    properties:
+      parent: projects/{{ env["project"] }}
+      roleId: {{ properties["roleId"] }}
+      role:
+        title: {{ properties["title"] }}
+        description: {{ properties["description"] }}
+        stage: {{ properties["stage"] }}
+        includedPermissions: {{ properties["includedPermissions"] }}
+
+  - name: customRole
+    type: iam.v1.role
+    properties:
+      roleId: customRoleId
+      title: "Custom Role Title"
+      description: "Description of the custom role"
+      includedPermissions:
+        - resourcemanager.projects.get
+        - resourcemanager.projects.list
+        - storage.buckets.get
+        - storage.objects.get
+
+  - name: attachRoleToServiceAccount
+      type: gcp-types/cloudresourcemanager-v1:virtual.projects.iamMemberBinding
+      properties:
+        projectId: my-project
+        role: projects/my-project/roles/customRoleId
+        members:
+          - serviceAccount:my-service-account@my-project.iam.gserviceaccount.com
+        condition:
+          title: "Custom Condition"
+          description: "Description of the condition"
+          expression: "request.time < timestamp('2024-12-31T23:59:59Z')"
+
+  - name: zenml-gcs-bucket-permissions
+    type: gcp-types/storage-v1:projects.iamPolicy
+    properties:
+      resource: ${project}
       bindings:
-      - role: roles/cloudfunctions.invoker
-        members:
-        - serviceAccount: $(ref.zenml-service-account.email)
+        - role: roles/storage.objectAdmin
+          members:
+            - serviceAccount: $(ref.zenml-service-account.email)
+        - role: roles/storage.buckets.get
+          members:
+            - serviceAccount: $(ref.zenml-service-account.email)
+        - role: roles/storage.buckets.list
+          members:
+            - serviceAccount: $(ref.zenml-service-account.email)
 
-- name: zenml-gcs-bucket-permissions
-  type: gcp-types/storage-v1:projects.iamPolicy
-  properties:
-    resource: ${project}
-    bindings:
-      - role: roles/storage.objectAdmin
-        members:
-          - serviceAccount: $(ref.zenml-service-account.email)
-      - role: roles/storage.buckets.get
-        members:
-          - serviceAccount: $(ref.zenml-service-account.email)
-      - role: roles/storage.buckets.list
-        members:
-          - serviceAccount: $(ref.zenml-service-account.email)
+  - name: zenml-artifact-registry-permissions
+    type: gcp-types/artifactregistry-v1:projects.iamPolicy
+    properties:
+      resource: projects/${project}/locations/${region}/repositories/zenml-${resourceNameSuffix}
+      bindings:
+        - role: roles/artifactregistry.writer
+          members:
+            - serviceAccount: $(ref.zenml-service-account.email)
 
-- name: zenml-artifact-registry-permissions
-  type: gcp-types/artifactregistry-v1:projects.iamPolicy
-  properties:
-    resource: projects/${project}/locations/${region}/repositories/zenml-${resourceNameSuffix}
-    bindings:
-      - role: roles/artifactregistry.writer
-        members:
-          - serviceAccount: $(ref.zenml-service-account.email)
-
-- name: zenml-vertex-ai-permissions
-  type: gcp-types/iam-v1:projects.serviceAccounts.setIamPolicy
-  properties:
-    resource: $(ref.zenml-service-account.email)
-    bindings:
-      - role: roles/aiplatform.user
-        members:
-          - serviceAccount: $(ref.zenml-service-account.email)
-      - role: roles/aiplatform.serviceAgent
-        members:
-          - serviceAccount: $(ref.zenml-service-account.email)
-      - role: roles/storage.objectCreator
-        members:
-          - serviceAccount: $(ref.zenml-service-account.email)
+  - name: zenml-vertex-ai-permissions
+    type: gcp-types/iam-v1:projects.serviceAccounts.setIamPolicy
+    properties:
+      resource: $(ref.zenml-service-account.email)
+      bindings:
+        - role: roles/aiplatform.user
+          members:
+            - serviceAccount: $(ref.zenml-service-account.email)
+        - role: roles/aiplatform.serviceAgent
+          members:
+            - serviceAccount: $(ref.zenml-service-account.email)
+        - role: roles/storage.objectCreator
+          members:
+            - serviceAccount: $(ref.zenml-service-account.email)
 
 outputs:
 - name: GCSBucket
