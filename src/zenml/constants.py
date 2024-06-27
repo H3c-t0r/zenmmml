@@ -458,8 +458,6 @@ MLSTACKS_SUPPORTED_STACK_COMPONENTS = [
     "step_operator",
 ]
 
-STACK_DEPLOY_PROVIDERS = ["aws", "gcp", "azure"]
-
 
 # Parameters for internal ZenML Models
 TEXT_FIELD_MAX_LENGTH = 65535

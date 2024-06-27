@@ -21,6 +21,8 @@ Parameters:
     ConstraintDescription: "Must be a valid alphanumeric string with no spaces"
     Default: "001"
 
+# TODO: OPTIONAL
+
   ZenMLServerURL:
     Type: String
     Description: ZenML Server URL
@@ -30,7 +32,6 @@ Parameters:
   ZenMLServerAPIToken:
     Type: String
     Description: ZenML Server API token
-    NoEcho: true  # This hides the parameter value from the AWS console and CLI
 
   TagName:
     Type: String
