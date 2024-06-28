@@ -112,6 +112,8 @@ Resources:
             Principal:
               Service: sagemaker.amazonaws.com
             Action: 'sts:AssumeRole'
+      ManagedPolicyArns: 
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'
       Policies:
         - PolicyName: S3Policy
           PolicyDocument:
@@ -156,9 +158,6 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow
-                Action: 'sagemaker:*'
-                Resource: '*'
               # Allow SageMaker to pass this role to itself
               - Effect: Allow
                 Action: iam:PassRole
