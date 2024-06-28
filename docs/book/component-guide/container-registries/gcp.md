@@ -19,10 +19,6 @@ You should use the GCP container registry if:
 
 ### How to deploy it
 
-{% hint style="warning" %}
-The GCP container registry (and GCP integration in general) currently only works for Python versions <3.11. The ZenML team is aware of this dependency clash/issue and is working on a fix. For now, please use Python <3.11 together with the GCP integration.
-{% endhint %}
-
 When using the Google Artifact Registry, you need to:
 
 * enable it [here](https://console.cloud.google.com/marketplace/product/google/artifactregistry.googleapis.com)
@@ -36,7 +32,7 @@ A GCP Container Registry can be deployed directly from the ZenML CLI:
 zenml container-registry deploy gcp_container_registry --flavor=gcp --provider=gcp ...
 ```
 
-You can pass other configurations specific to the stack components as key-value arguments. If you don't provide a name, a random one is generated for you. For more information about how to work use the CLI for this, please refer to the [dedicated documentation section](../../how-to/stack-deployment/deploy-a-stack-component.md).
+You can pass other configurations specific to the stack components as key-value arguments. If you don't provide a name, a random one is generated for you. For more information about how to work use the CLI for this, please refer to the [dedicated documentation section](../../how-to/stack-deployment/deploy-a-stack-using-mlstacks.md).
 
 ## How to find the registry URI
 
