@@ -12,25 +12,25 @@ Description: |
   in the ZenML Server.
 
 Parameters:
-  ResourceNameSuffix:
+  ResourceName:
     Type: String
     Description: |
-      Unique random suffix to use for the name of all resources. Can include
-      alphanumeric characters and hyphens and must be between 6-15 characters
-      in length.
-    MinLength: 6
-    MaxLength: 15
-    AllowedPattern: "[a-zA-Z0-9-]+"
+      Unique string value to use to name all resources. Can include
+      lowercase alphanumeric characters and hyphens and must be between 6-32
+      characters in length.
+    MinLength: 8
+    MaxLength: 32
+    AllowedPattern: "[a-z0-9-]+"
     ConstraintDescription: |
-      Must be 6-15 characters in length containing only alphanumeric characters
-      and hyphens.
+      Must be 8-32 characters in length containing only lowercase alphanumeric
+      characters and hyphens.
 
   ZenMLServerURL:
     Type: String
     Description: |
       URL to the ZenML Server where the stack will be registered. If not
       provided, the stack will not be registered.
-    AllowedPattern: "^https?://.*"
+    AllowedPattern: "^(https?://.*)?$"
     ConstraintDescription: Must be a valid URL starting with http:// or https://
     Default: ""
 
@@ -60,16 +60,16 @@ Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
+      BucketName: !Sub '${ResourceName}'
       AccessControl: Private
       Tags:
         - Key: !Ref TagName
           Value: !Ref TagValue
 
-  ECRRegistry:
+  ECRRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
+      RepositoryName: !Sub '${ResourceName}'
       Tags:
         - Key: !Ref TagName
           Value: !Sub TagValue
@@ -77,7 +77,7 @@ Resources:
   IAMUser:
     Type: AWS::IAM::User
     Properties:
-      UserName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
+      UserName: !Sub '${ResourceName}'
       Policies:
         - PolicyName: AssumeRole
           PolicyDocument: 
@@ -100,20 +100,20 @@ Resources:
     Type: AWS::IAM::Role
     DependsOn: IAMUser
     Properties:
-      RoleName: !Sub '${AWS::StackName}${ResourceNameSuffix}'
+      RoleName: !Sub '${ResourceName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/${AWS::StackName}${ResourceNameSuffix}'
+              AWS: !Sub '${IAMUser.Arn}'
             Action: 'sts:AssumeRole'
           - Effect: Allow
             Principal:
               Service: sagemaker.amazonaws.com
             Action: 'sts:AssumeRole'
       Policies:
-        - PolicyName: S3Policy
+        - PolicyName: S3WritePolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -124,17 +124,15 @@ Resources:
                   - 's3:PutObject'
                   - 's3:DeleteObject'
                 Resource:
-                  - !Sub 'arn:aws:s3:::${AWS::StackName}${ResourceNameSuffix}/*'
-                  - !Sub 'arn:aws:s3:::${AWS::StackName}${ResourceNameSuffix}'
-        - PolicyName: ECRPolicy
+                  - !Sub '${S3Bucket.Arn}'
+                  - !Sub '${S3Bucket.Arn}/*'
+        - PolicyName: ECRWritePolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - 'ecr:DescribeRegistry'
-                  - 'ecr:DescribeRepositories'
-                  - 'ecr:ListRepositories'
                   - 'ecr:BatchGetImage'
                   - 'ecr:DescribeImages'
                   - 'ecr:BatchCheckLayerAvailability'
@@ -143,7 +141,17 @@ Resources:
                   - 'ecr:UploadLayerPart'
                   - 'ecr:CompleteLayerUpload'
                   - 'ecr:PutImage'
-                Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${AWS::StackName}${ResourceNameSuffix}'
+                Resource: !Sub '${ECRRepository.Arn}'
+        # NOTE: this is still required for ZenML to work with ECR
+        - PolicyName: ECRListPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecr:DescribeRepositories'
+                  - 'ecr:ListRepositories'
+                Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
         - PolicyName: SageMakerPolicy
           PolicyDocument:
             Version: '2012-10-17'
@@ -156,6 +164,7 @@ Resources:
     Type: AWS::Serverless::Function
     Condition: RegisterZenMLStack
     Properties:
+      FunctionName: !Sub '${ResourceName}'
       Handler: index.handler
       Runtime: python3.8
       MemorySize: 512
@@ -206,7 +215,7 @@ Resources:
                     send_response(event, context, 'SUCCESS', {'Message': 'Resource updated successfully'})
                     return
 
-                url = os.environ['ZENML_SERVER_URL']
+                url = os.environ['ZENML_SERVER_URL'].lstrip('/')+'/api/v1/workspaces/default/full-stack'
                 api_token = os.environ['ZENML_SERVER_API_TOKEN']
                 payload = event['ResourceProperties']['Payload']
 
@@ -241,40 +250,41 @@ Resources:
       ServiceTimeout: 300
       Payload: !Sub |
             {
-              "name": "aws-${AWS::StackName}",
-              "description": "AWS stack deployed by CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region."
+              "name": "aws-cf-${AWS::Region}",
+              "description": "Deployed by AWS CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region.",
               "service-connectors": [
                 {
-                  "name": "aws-${AWS::StackName}",
-                  "type": "aws",
-                  "auth-method": "iam-role",
-                  "aws_access_key_id": "${IAMUserAccessKey}",
-                  "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
-                  "iam_role": "${StackAccessRole.Arn}"
-                  "region": "${AWS::Region}"
+                  "connector_type": "aws",
+                  "auth_type": "iam-role",
+                  "configuration": {
+                    "aws_access_key_id": "${IAMUserAccessKey}",
+                    "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
+                    "iam_role": "${StackAccessRole.Arn}"
+                    "region": "${AWS::Region}"
+                  }
                 }
               ],
-              "components": [
-                {
-                  "name": "s3-${AWS::StackName}",
-                  "type": "artifact-store",
+              "components": {
+                "artifact-store": {
                   "flavor": "s3",
-                  "path": "s3://${S3Bucket}",
-                  "connector": "aws-${AWS::StackName}"
+                  "service_connector_index": 0,
+                  "configuration": {
+                    "path": "s3://${S3Bucket}"
+                  }
                 },
-                {
-                  "name": "ecr-${AWS::StackName}",
-                  "type": "container-registry",
+                "container-registry":{
                   "flavor": "aws",
-                  "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
-                  "connector": "aws-${AWS::StackName}"
+                  "service_connector_index": 0,
+                  "configuration": {
+                    "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
+                  }
                 },
-                {
-                  "name": "sagemaker-${AWS::StackName}",
-                  "type": "orchestrator",
+                "orchestrator": {
                   "flavor": "sagemaker",
-                  "execution_role": "${StackAccessRole.Arn}",
-                  "connector": "aws-${AWS::StackName}"
+                  "service_connector_index": 0,
+                  "configuration": {
+                    "execution_role": "${StackAccessRole.Arn}",
+                  }
                 }
               ]
             }
@@ -300,40 +310,41 @@ Outputs:
     Description: "ZenML Stack JSON (can be imported with `zenml stack import`)"
     Value: !Sub |
       {
-        "name": "aws-${AWS::StackName}",
-        "description": "AWS stack deployed by CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region."
+        "name": "aws-cf-${AWS::Region}",
+        "description": "Deployed by AWS CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region.",
         "service-connectors": [
           {
-            "name": "aws-${AWS::StackName}",
-            "type": "aws",
-            "auth-method": "iam-role",
-            "aws_access_key_id": "${IAMUserAccessKey}",
-            "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
-            "iam_role": "${StackAccessRole.Arn}"
-            "region": "${AWS::Region}"
+            "connector_type": "aws",
+            "auth_type": "iam-role",
+            "configuration": {
+              "aws_access_key_id": "${IAMUserAccessKey}",
+              "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
+              "iam_role": "${StackAccessRole.Arn}"
+              "region": "${AWS::Region}"
+            }
           }
         ],
-        "components": [
-          {
-            "name": "s3-${AWS::StackName}",
-            "type": "artifact-store",
+        "components": {
+          "artifact-store": {
             "flavor": "s3",
-            "path": "s3://${S3Bucket}",
-            "connector": "aws-${AWS::StackName}"
+            "service_connector_index": 0,
+            "configuration": {
+              "path": "s3://${S3Bucket}"
+            }
           },
-          {
-            "name": "ecr-${AWS::StackName}",
-            "type": "container-registry",
+          "container-registry":{
             "flavor": "aws",
-            "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
-            "connector": "aws-${AWS::StackName}"
+            "service_connector_index": 0,
+            "configuration": {
+              "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
+            }
           },
-          {
-            "name": "sagemaker-${AWS::StackName}",
-            "type": "orchestrator",
+          "orchestrator": {
             "flavor": "sagemaker",
-            "execution_role": "${StackAccessRole.Arn}",
-            "connector": "aws-${AWS::StackName}"
+            "service_connector_index": 0,
+            "configuration": {
+              "execution_role": "${StackAccessRole.Arn}",
+            }
           }
         ]
       }

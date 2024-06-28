@@ -1648,7 +1648,7 @@ def deploy(
                     stack = deployment.get_stack()
                     if stack:
                         break
-                    time.sleep(5)
+                    time.sleep(10)
 
                 analytics_handler.metadata.update(
                     {
@@ -1658,7 +1658,7 @@ def deploy(
 
                 console.print(
                     Markdown(
-                        f"Stack `{stack.name}` successfully registered! 🚀"
+                        f"## Stack `{stack.name}` successfully registered! 🚀"
                     )
                 )
                 cli_utils.print_stack_configuration(
@@ -1667,8 +1667,10 @@ def deploy(
                 )
 
             console.print(
-                deployment.post_deploy_instructions(
-                    cancelled=False,
+                Markdown(
+                    deployment.post_deploy_instructions(
+                        cancelled=False,
+                    )
                 )
             )
 

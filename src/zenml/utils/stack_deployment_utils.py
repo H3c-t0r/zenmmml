@@ -15,7 +15,7 @@
 
 import datetime
 from abc import abstractmethod
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -104,7 +104,13 @@ class AWSZenMLCloudStackDeployment(ZenMLCloudStackDeployment):
 
     date_start: datetime.datetime
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the AWS ZenML Cloud Stack Deployment.
+
+        Args:
+            *args: Additional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         date_start = datetime.datetime.utcnow()
         kwargs["date_start"] = date_start
         super().__init__(*args, **kwargs)
@@ -151,11 +157,13 @@ details about the associated ZenML stack automatically registered with ZenML.
 your AWS account. Please ensure you have the necessary permissions and are aware
 of any potential costs:
 
-- An S3 bucket to store pipeline artifacts.
-- An ECR repository to store pipeline Docker images.
-- Sagemaker resources to run pipelines.
-- An IAM user, IAM role and AWS access key with the minimum necessary
-permissions to access the above resources to run pipelines.
+- An S3 bucket registered as a [ZenML artifact store](https://docs.zenml.io/stack-components/artifact-stores/s3).
+- An ECR repository registered as a [ZenML container registry](https://docs.zenml.io/stack-components/container-registries/aws).
+- Sagemaker registered as a [ZenML orchestrator](https://docs.zenml.io/stack-components/orchestrators/sagemaker).
+- An IAM user and IAM role with the minimum necessary permissions to access the
+above resources.
+- An AWS access key used to give access to ZenML to connect to the above
+resources through a [ZenML service connector](https://docs.zenml.io/how-to/auth-management/aws-service-connector).
 
 The CloudFormation stack will automatically create an AWS secret key and
 will share it with ZenML to give it permissions to access the resources created
@@ -182,7 +190,7 @@ CloudFormation stack.
         params = dict(
             stackName=self.stack_name,
             templateURL="https://zenml-cf-templates.s3.eu-central-1.amazonaws.com/aws-ecr-s3-sagemaker.yaml",
-            param_ResourceNameSuffix=random_str(6),
+            param_ResourceName=f"zenml-{random_str(6).lower()}",
             param_ZenMLServerURL=client.zen_store.config.url,
             param_ZenMLServerAPIToken=api_token,
         )
@@ -219,13 +227,14 @@ CloudFormation stack.
         # remove milliseconds from the date
         stacks = client.list_stacks(
             created=f"gt:{str(self.date_start.replace(microsecond=0))}",
+            sort_by="desc:created",
             size=50,
         )
 
         if not stacks.items:
             return None
 
-        # Set the start date to the earliest stack creation date to
+        # Set the start date to the latest stack creation date to
         # avoid fetching the same stacks again
         self.date_start = stacks.items[0].created
 
@@ -260,7 +269,7 @@ CloudFormation stack.
                 if component.connector is None:
                     return False
 
-                return False
+                return True
 
             if not check_component(StackComponentType.ARTIFACT_STORE, "s3"):
                 continue
