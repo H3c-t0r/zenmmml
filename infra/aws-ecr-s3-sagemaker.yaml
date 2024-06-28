@@ -113,7 +113,7 @@ Resources:
               Service: sagemaker.amazonaws.com
             Action: 'sts:AssumeRole'
       Policies:
-        - PolicyName: S3WritePolicy
+        - PolicyName: S3Policy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -126,7 +126,7 @@ Resources:
                 Resource:
                   - !Sub '${S3Bucket.Arn}'
                   - !Sub '${S3Bucket.Arn}/*'
-        - PolicyName: ECRWritePolicy
+        - PolicyName: ECRPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -142,11 +142,11 @@ Resources:
                   - 'ecr:CompleteLayerUpload'
                   - 'ecr:PutImage'
                 Resource: !Sub '${ECRRepository.Arn}'
-        # NOTE: this is still required for ZenML to work with ECR
-        - PolicyName: ECRListPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                Resource: '*'
+              # NOTE: this is still required for ZenML to work with ECR
               - Effect: Allow
                 Action:
                   - 'ecr:DescribeRepositories'
@@ -178,13 +178,14 @@ Resources:
         import os
         import json
         import urllib.request
+        import urllib.error
 
         def send_response(event, context, response_status, response_data, physical_resource_id=None):
             response_url = event['ResponseURL']
             
             response_body = {
                 'Status': response_status,
-                'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
+                'Reason': f'{response_data}\nSee the details in CloudWatch Log Stream: ' + context.log_stream_name,
                 'PhysicalResourceId': physical_resource_id or context.log_stream_name,
                 'StackId': event['StackId'],
                 'RequestId': event['RequestId'],
@@ -226,17 +227,31 @@ Resources:
 
                 data = payload.encode('utf-8')
                 req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-                with urllib.request.urlopen(req) as response:
-                    status_code = response.getcode()
-                    response_body = response.read().decode('utf-8')
+                try:
+                  with urllib.request.urlopen(req) as response:
+                      status_code = response.getcode()
+                      response_body = response.read().decode('utf-8')
+                except urllib.error.HTTPError as e:
+                    status_code = e.code
+                    response_body = e.read().decode('utf-8')
 
                 print(status_code)
                 print(response_body)
 
                 if status_code == 200:
-                    send_response(event, context, 'SUCCESS', {'Message': 'Resource creation successful'})
+                    send_response(
+                      event,
+                      context,
+                      'SUCCESS',
+                      {'Message': 'Stack successfully registered with ZenML'}
+                    )
                 else:
-                    send_response(event, context, 'FAILED', {'Message': 'Failed with status code {}'.format(status_code)})
+                    send_response(
+                      event,
+                      context,
+                      'FAILED',
+                      {'Message': f'Failed to register the ZenML stack. The ZenML Server replied with HTTP status code {status_code}: {response_body}'}
+                    )
 
             except Exception as e:
                 print(f"Error: {str(e)}")
@@ -249,45 +264,46 @@ Resources:
       ServiceToken: !GetAtt InvokeZenMLAPIFunction.Arn
       ServiceTimeout: 300
       Payload: !Sub |
+        {
+          "name": "aws-cf-${AWS::Region}",
+          "description": "Deployed by AWS CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region.",
+          "service_connectors": [
             {
-              "name": "aws-cf-${AWS::Region}",
-              "description": "Deployed by AWS CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region.",
-              "service-connectors": [
-                {
-                  "connector_type": "aws",
-                  "auth_type": "iam-role",
-                  "configuration": {
-                    "aws_access_key_id": "${IAMUserAccessKey}",
-                    "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
-                    "iam_role": "${StackAccessRole.Arn}"
-                    "region": "${AWS::Region}"
-                  }
-                }
-              ],
-              "components": {
-                "artifact-store": {
-                  "flavor": "s3",
-                  "service_connector_index": 0,
-                  "configuration": {
-                    "path": "s3://${S3Bucket}"
-                  }
-                },
-                "container-registry":{
-                  "flavor": "aws",
-                  "service_connector_index": 0,
-                  "configuration": {
-                    "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
-                  }
-                },
-                "orchestrator": {
-                  "flavor": "sagemaker",
-                  "service_connector_index": 0,
-                  "configuration": {
-                    "execution_role": "${StackAccessRole.Arn}",
-                  }
-                }
-              ]
+              "connector_type": "aws",
+              "auth_type": "iam-role",
+              "configuration": {
+                "aws_access_key_id": "${IAMUserAccessKey}",
+                "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
+                "role_arn": "${StackAccessRole.Arn}",
+                "region": "${AWS::Region}"
+              }
             }
+          ],
+          "components": {
+            "artifact_store": {
+              "flavor": "s3",
+              "service_connector_index": 0,
+              "configuration": {
+                "path": "s3://${S3Bucket}"
+              }
+            },
+            "container_registry":{
+              "flavor": "aws",
+              "service_connector_index": 0,
+              "configuration": {
+                "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
+                "default_repository": "${ECRRepository}"
+              }
+            },
+            "orchestrator": {
+              "flavor": "sagemaker",
+              "service_connector_index": 0,
+              "configuration": {
+                "execution_role": "${StackAccessRole.Arn}"
+              }
+            }
+          }
+        }
 
 Outputs:
   AWSRegion:
@@ -312,39 +328,40 @@ Outputs:
       {
         "name": "aws-cf-${AWS::Region}",
         "description": "Deployed by AWS CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region.",
-        "service-connectors": [
+        "service_connectors": [
           {
             "connector_type": "aws",
             "auth_type": "iam-role",
             "configuration": {
               "aws_access_key_id": "${IAMUserAccessKey}",
               "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
-              "iam_role": "${StackAccessRole.Arn}"
+              "role_arn": "${StackAccessRole.Arn}",
               "region": "${AWS::Region}"
             }
           }
         ],
         "components": {
-          "artifact-store": {
+          "artifact_store": {
             "flavor": "s3",
             "service_connector_index": 0,
             "configuration": {
               "path": "s3://${S3Bucket}"
             }
           },
-          "container-registry":{
+          "container_registry":{
             "flavor": "aws",
             "service_connector_index": 0,
             "configuration": {
               "uri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com",
+              "default_repository": "${ECRRepository}"
             }
           },
           "orchestrator": {
             "flavor": "sagemaker",
             "service_connector_index": 0,
             "configuration": {
-              "execution_role": "${StackAccessRole.Arn}",
+              "execution_role": "${StackAccessRole.Arn}"
             }
           }
-        ]
+        }
       }

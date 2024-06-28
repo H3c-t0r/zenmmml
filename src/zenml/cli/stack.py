@@ -1684,7 +1684,7 @@ def deploy(
             raise
 
 
-@stack.command(help="Deploy a stack using mlstacks.")
+@stack.command(help="[DEPRECATED] Deploy a stack using mlstacks.")
 @click.option(
     "--provider",
     "-p",
