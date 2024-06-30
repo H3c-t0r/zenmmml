@@ -117,6 +117,7 @@ Resources:
                 Action:
                   - 's3:ListBucket'
                   - 's3:GetBucketLocation'
+                  - 's3:GetBucketVersioning'
                   - 's3:GetObject'
                   - 's3:PutObject'
                   - 's3:DeleteObject'
@@ -344,7 +345,7 @@ Outputs:
     Value: !GetAtt StackAccessRole.Arn
 
   SageMakerIAMRoleARN:
-    Description: "IAM Role ARN"
+    Description: "SageMaker execution IAM Role ARN"
     Value: !GetAtt SageMakerRuntimeRole.Arn
 
   ZenMLStack:

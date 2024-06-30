@@ -67,6 +67,7 @@ The configured credentials must have at least the following [AWS IAM permissions
 
 * `s3:ListBucket`
 * `s3:GetBucketLocation`
+* `s3:GetBucketVersioning`
 * `s3:GetObject`
 * `s3:PutObject`
 * `s3:DeleteObject`
