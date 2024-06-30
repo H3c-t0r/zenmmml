@@ -205,8 +205,8 @@ class PipelineDockerImageBuilder:
                         repository = (
                             container_registry.config.default_repository
                         )
-                    else:
-                        repository = DEFAULT_ZENML_DOCKER_REPOSITORY
+
+                repository = repository or DEFAULT_ZENML_DOCKER_REPOSITORY
                 user_image_name = f"{repository}:" f"{tag}-intermediate-build"
                 if push and container_registry:
                     user_image_name = (
@@ -376,8 +376,8 @@ class PipelineDockerImageBuilder:
         if not repository:
             if container_registry:
                 repository = container_registry.config.default_repository
-            else:
-                repository = DEFAULT_ZENML_DOCKER_REPOSITORY
+
+        repository = repository or DEFAULT_ZENML_DOCKER_REPOSITORY
 
         target_image_name = f"{repository}:{tag}"
         if container_registry:
