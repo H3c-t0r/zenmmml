@@ -518,6 +518,7 @@ that the connector will be allowed to access (e.g. `arn:aws:s3:::*` and
 `arn:aws:s3:::*/*` represent all the available S3 buckets).
 
 - `s3:ListBucket`
+- `s3:GetBucketLocation`
 - `s3:GetObject`
 - `s3:PutObject`
 - `s3:DeleteObject`

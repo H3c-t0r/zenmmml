@@ -108,12 +108,6 @@ Resources:
             Principal:
               AWS: !Sub '${IAMUser.Arn}'
             Action: 'sts:AssumeRole'
-          - Effect: Allow
-            Principal:
-              Service: sagemaker.amazonaws.com
-            Action: 'sts:AssumeRole'
-      ManagedPolicyArns: 
-        - 'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'
       Policies:
         - PolicyName: S3Policy
           PolicyDocument:
@@ -122,6 +116,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - 's3:ListBucket'
+                  - 's3:GetBucketLocation'
                   - 's3:GetObject'
                   - 's3:PutObject'
                   - 's3:DeleteObject'
@@ -158,11 +153,34 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # Allow SageMaker to pass this role to itself
+              # Allow this role to create, start and monitor SageMaker pipelines
+              - Effect: Allow
+                Action:
+                  - 'sagemaker:CreatePipeline'
+                  - 'sagemaker:StartPipelineExecution'
+                  - 'sagemaker:DescribePipeline'
+                  - 'sagemaker:DescribePipelineExecution'
+                Resource: '*'
+              # Allow this role to pass the SageMaker execution role to the pipeline
               - Effect: Allow
                 Action: iam:PassRole
-                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ResourceName}'
-          
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ResourceName}-sagemaker'
+
+  SageMakerRuntimeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ResourceName}-sagemaker'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns: 
+        - 'arn:aws:iam::aws:policy/AmazonSageMakerFullAccess'
+
+
   InvokeZenMLAPIFunction:
     Type: AWS::Serverless::Function
     Condition: RegisterZenMLStack
@@ -302,7 +320,7 @@ Resources:
               "flavor": "sagemaker",
               "service_connector_index": 0,
               "configuration": {
-                "execution_role": "${StackAccessRole.Arn}"
+                "execution_role": "${SageMakerRuntimeRole.Arn}"
               }
             }
           }
@@ -324,6 +342,10 @@ Outputs:
   IAMRoleARN:
     Description: "IAM Role ARN"
     Value: !GetAtt StackAccessRole.Arn
+
+  SageMakerIAMRoleARN:
+    Description: "IAM Role ARN"
+    Value: !GetAtt SageMakerRuntimeRole.Arn
 
   ZenMLStack:
     Description: "ZenML Stack JSON (can be imported with `zenml stack import`)"
@@ -363,7 +385,7 @@ Outputs:
             "flavor": "sagemaker",
             "service_connector_index": 0,
             "configuration": {
-              "execution_role": "${StackAccessRole.Arn}"
+              "execution_role": "${SageMakerRuntimeRole.Arn}"
             }
           }
         }
