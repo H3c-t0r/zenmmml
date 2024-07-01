@@ -288,8 +288,8 @@ Resources:
           "description": "Deployed by AWS CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region.",
           "service_connectors": [
             {
-              "connector_type": "aws",
-              "auth_type": "iam-role",
+              "type": "aws",
+              "auth-method": "iam-role",
               "configuration": {
                 "aws_access_key_id": "${IAMUserAccessKey}",
                 "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
@@ -353,8 +353,8 @@ Outputs:
         "description": "Deployed by AWS CloudFormation stack ${AWS::StackName} in the ${AWS::AccountId} account and ${AWS::Region} region.",
         "service_connectors": [
           {
-            "connector_type": "aws",
-            "auth_type": "iam-role",
+            "type": "aws",
+            "auth-method": "iam-role",
             "configuration": {
               "aws_access_key_id": "${IAMUserAccessKey}",
               "aws_secret_access_key": "${IAMUserAccessKey.SecretAccessKey}",
