@@ -19,7 +19,15 @@ import re
 import time
 import webbrowser
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Union,
+)
 from uuid import UUID
 
 import click
@@ -33,6 +41,7 @@ from zenml.analytics.enums import AnalyticsEvent
 from zenml.analytics.utils import track_handler
 from zenml.cli import utils as cli_utils
 from zenml.cli.cli import TagGroup, cli
+from zenml.cli.text_utils import OldSchoolMarkdownHeading
 from zenml.cli.utils import (
     _component_display_name,
     confirmation,
@@ -72,7 +81,7 @@ from zenml.models.v2.misc.full_stack import (
 from zenml.models.v2.misc.service_connector_type import (
     ServiceConnectorTypedResourcesModel,
 )
-from zenml.utils.dashboard_utils import get_stack_url
+from zenml.utils.dashboard_utils import get_component_url, get_stack_url
 from zenml.utils.io_utils import create_dir_recursive_if_not_exists
 from zenml.utils.mlstacks_utils import (
     convert_click_params_to_mlstacks_primitives,
@@ -1582,11 +1591,19 @@ connectors.
     "hyphens and have a maximum length of 16 characters.",
     callback=validate_name,
 )
+@click.option(
+    "--set",
+    "set_stack",
+    is_flag=True,
+    help="Immediately set this stack as active.",
+    type=click.BOOL,
+)
 @click.pass_context
 def deploy(
     ctx: click.Context,
     provider: str,
     stack_name: Optional[str] = None,
+    set_stack: bool = False,
 ) -> None:
     """Deploy and register a fully functional cloud ZenML stack.
 
@@ -1595,7 +1612,15 @@ def deploy(
         provider: The cloud provider to deploy the stack to.
         stack_name: A name for the ZenML stack that gets imported as a result
             of the recipe deployment.
+        set_stack: Immediately set the deployed stack as active.
     """
+    # Set up the markdown renderer to use the old-school markdown heading
+    Markdown.elements.update(
+        {
+            "heading_open": OldSchoolMarkdownHeading,
+        }
+    )
+
     client = Client()
     if client.zen_store.is_local_store():
         cli_utils.error(
@@ -1656,32 +1681,41 @@ def deploy(
                     }
                 )
 
-                console.print(
-                    Markdown(
-                        f"## Stack `{stack.name}` successfully registered! 🚀"
-                    )
-                )
-                cli_utils.print_stack_configuration(
-                    stack=stack,
-                    active=False,
-                )
-
-            console.print(
-                Markdown(
-                    deployment.post_deploy_instructions(
-                        cancelled=False,
-                    )
-                )
-            )
-
         except KeyboardInterrupt:
             cli_utils.declare("Stack deployment aborted.")
             console.print(
-                deployment.post_deploy_instructions(
-                    cancelled=True,
+                Markdown(
+                    deployment.post_deploy_instructions(
+                        cancelled=True,
+                    )
                 )
             )
             raise
+
+    stack_desc = f"""## Stack successfully registered! 🚀
+Stack [{stack.name}]({get_stack_url(stack)}):\n"""
+
+    for component_type, components in stack.components.items():
+        if components:
+            component = components[0]
+            stack_desc += (
+                f" * `{component.flavor}` {component_type.value}: "
+                f"[{component.name}]({get_component_url(component)})\n"
+            )
+
+    console.print(Markdown(stack_desc))
+
+    console.print(
+        Markdown(
+            deployment.post_deploy_instructions(
+                cancelled=False,
+            )
+        )
+    )
+
+    if set_stack:
+        client.activate_stack(stack.id)
+        cli_utils.declare(f"\nStack `{stack.name}` set as active")
 
 
 @stack.command(help="[DEPRECATED] Deploy a stack using mlstacks.")
