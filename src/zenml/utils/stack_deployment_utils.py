@@ -286,6 +286,8 @@ CloudFormation stack.
 
             return stack
 
+        return None
+
     def post_deploy_instructions(self, cancelled: bool) -> str:
         """Return instructions on what to do after the deployment is complete or cancelled.
 
