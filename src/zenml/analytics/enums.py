@@ -85,6 +85,9 @@ class AnalyticsEvent(str, Enum):
     DEPLOY_STACK_COMPONENT = "Stack component deployed"
     DESTROY_STACK_COMPONENT = "Stack component destroyed"
 
+    # Cloud stack deployment
+    DEPLOY_STACK_CLOUD = "Stack deployed in cloud"
+
     # Tag created
     CREATED_TAG = "Tag created"
 

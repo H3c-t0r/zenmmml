@@ -1,0 +1,11 @@
+Welcome to Google Cloud Shell!
+
+This script will deploy the ZenML stack to your GCP project.
+
+1. Make sure you are authenticated with GCP and have the necessary permissions.
+
+2. Run the following command to deploy the stack:
+
+```sh
+gcloud deployment-manager deployments create zenml-gcp-stack --config gcp-gar-gcs-vertex-config.yaml
+```

@@ -15,12 +15,24 @@
 
 import getpass
 import os
+import re
+import time
+import webbrowser
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Union,
+)
 from uuid import UUID
 
 import click
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.prompt import Confirm
 from rich.syntax import Syntax
 
@@ -29,6 +41,7 @@ from zenml.analytics.enums import AnalyticsEvent
 from zenml.analytics.utils import track_handler
 from zenml.cli import utils as cli_utils
 from zenml.cli.cli import TagGroup, cli
+from zenml.cli.text_utils import OldSchoolMarkdownHeading
 from zenml.cli.utils import (
     _component_display_name,
     confirmation,
@@ -48,7 +61,11 @@ from zenml.constants import (
     MLSTACKS_SUPPORTED_STACK_COMPONENTS,
     STACK_RECIPE_MODULAR_RECIPES,
 )
-from zenml.enums import CliCategories, StackComponentType
+from zenml.enums import (
+    CliCategories,
+    StackComponentType,
+    StackDeploymentProvider,
+)
 from zenml.exceptions import (
     IllegalOperationError,
     ProvisioningError,
@@ -64,7 +81,7 @@ from zenml.models.v2.misc.full_stack import (
 from zenml.models.v2.misc.service_connector_type import (
     ServiceConnectorTypedResourcesModel,
 )
-from zenml.utils.dashboard_utils import get_stack_url
+from zenml.utils.dashboard_utils import get_component_url, get_stack_url
 from zenml.utils.io_utils import create_dir_recursive_if_not_exists
 from zenml.utils.mlstacks_utils import (
     convert_click_params_to_mlstacks_primitives,
@@ -75,6 +92,7 @@ from zenml.utils.mlstacks_utils import (
     stack_spec_exists,
     verify_spec_and_tf_files_exist,
 )
+from zenml.utils.stack_deployment_utils import get_stack_deployment
 from zenml.utils.yaml_utils import read_yaml, write_yaml
 
 if TYPE_CHECKING:
@@ -1519,7 +1537,188 @@ def _get_deployment_params_interactively(
     return deployment_values
 
 
-@stack.command(help="Deploy a stack using mlstacks.")
+def validate_name(ctx: click.Context, param: str, value: str) -> str:
+    """Validate the name of the stack.
+
+    Args:
+        ctx: The click context.
+        param: The parameter name.
+        value: The value of the parameter.
+    """
+    if not value:
+        return value
+
+    if not re.match(r"^[a-zA-Z0-9-]*$", value):
+        raise click.BadParameter(
+            "Stack name must contain only alphanumeric characters and hyphens."
+        )
+
+    if len(value) > 16:
+        raise click.BadParameter(
+            "Stack name must have a maximum length of 16 characters."
+        )
+
+    return value
+
+
+@stack.command(
+    help="""Deploy a fully functional ZenML stack in one of the cloud providers.
+
+Running this command will initiate an assisted process that will walk you
+through automatically provisioning all the cloud infrastructure resources
+necessary for a fully functional ZenML stack in the cloud provider of your
+choice. A corresponding ZenML stack will also be automatically registered along
+with all the necessary components and properly authenticated through service
+connectors.
+"""
+)
+@click.option(
+    "--provider",
+    "-p",
+    "provider",
+    required=True,
+    type=click.Choice(StackDeploymentProvider.values()),
+)
+@click.option(
+    "--name",
+    "-n",
+    "stack_name",
+    type=click.STRING,
+    required=False,
+    help="Custom string to use as a prefix to generate names for the ZenML "
+    "stack, its components service connectors as well as provisioned cloud "
+    "infrastructure resources. May only contain alphanumeric characters and "
+    "hyphens and have a maximum length of 16 characters.",
+    callback=validate_name,
+)
+@click.option(
+    "--set",
+    "set_stack",
+    is_flag=True,
+    help="Immediately set this stack as active.",
+    type=click.BOOL,
+)
+@click.pass_context
+def deploy(
+    ctx: click.Context,
+    provider: str,
+    stack_name: Optional[str] = None,
+    set_stack: bool = False,
+) -> None:
+    """Deploy and register a fully functional cloud ZenML stack.
+
+    Args:
+        ctx: The click context.
+        provider: The cloud provider to deploy the stack to.
+        stack_name: A name for the ZenML stack that gets imported as a result
+            of the recipe deployment.
+        set_stack: Immediately set the deployed stack as active.
+    """
+    # Set up the markdown renderer to use the old-school markdown heading
+    Markdown.elements.update(
+        {
+            "heading_open": OldSchoolMarkdownHeading,
+        }
+    )
+
+    client = Client()
+    if client.zen_store.is_local_store():
+        cli_utils.error(
+            "This feature cannot be used with a local ZenML deployment. "
+            "ZenML needs to be accessible from the cloud provider to allow the "
+            "stack and its components to be registered automatically. "
+            "Please deploy ZenML in a remote environment as described in the "
+            "documentation: https://docs.zenml.io/getting-started/deploying-zenml "
+            "or use a managed ZenML Pro server instance for quick access to "
+            "this feature and more: https://www.zenml.io/pro"
+        )
+
+    with track_handler(
+        event=AnalyticsEvent.DEPLOY_STACK_CLOUD,
+    ) as analytics_handler:
+        analytics_handler.metadata = {
+            "stack_provider": provider,
+        }
+
+        deployment = get_stack_deployment(
+            provider=StackDeploymentProvider(provider), stack_name=stack_name
+        )
+
+        console.print(Markdown(deployment.description()))
+        console.print(Markdown(deployment.deploy_instructions()))
+
+        if not cli_utils.confirmation(
+            "\n\nProceed to continue with the deployment. You will be "
+            f"automatically redirected to {provider.upper()} in your browser.",
+        ):
+            raise click.Abort()
+
+        deployment_url, deployment_url_title = deployment.deploy_url()
+        webbrowser.open(deployment_url)
+        console.print(
+            Markdown(
+                f"If your browser did not open automatically, please open "
+                f"the following URL into your browser to deploy the stack to "
+                f"{provider.upper()}: "
+                f"[{deployment_url_title}]({deployment_url}).\n\n"
+            )
+        )
+
+        try:
+            with console.status(
+                "Waiting for the deployment to complete and the stack to be "
+                "registered. Press CTRL+C to abort...\n"
+            ):
+                while True:
+                    stack = deployment.get_stack()
+                    if stack:
+                        break
+                    time.sleep(10)
+
+                analytics_handler.metadata.update(
+                    {
+                        "stack_id": stack.id,
+                    }
+                )
+
+        except KeyboardInterrupt:
+            cli_utils.declare("Stack deployment aborted.")
+            console.print(
+                Markdown(
+                    deployment.post_deploy_instructions(
+                        cancelled=True,
+                    )
+                )
+            )
+            raise
+
+    stack_desc = f"""## Stack successfully registered! 🚀
+Stack [{stack.name}]({get_stack_url(stack)}):\n"""
+
+    for component_type, components in stack.components.items():
+        if components:
+            component = components[0]
+            stack_desc += (
+                f" * `{component.flavor}` {component_type.value}: "
+                f"[{component.name}]({get_component_url(component)})\n"
+            )
+
+    console.print(Markdown(stack_desc))
+
+    console.print(
+        Markdown(
+            deployment.post_deploy_instructions(
+                cancelled=False,
+            )
+        )
+    )
+
+    if set_stack:
+        client.activate_stack(stack.id)
+        cli_utils.declare(f"\nStack `{stack.name}` set as active")
+
+
+@stack.command(help="[DEPRECATED] Deploy a stack using mlstacks.")
 @click.option(
     "--provider",
     "-p",
@@ -1659,7 +1858,7 @@ def _get_deployment_params_interactively(
     help="Deploy the stack interactively.",
 )
 @click.pass_context
-def deploy(
+def deploy_mlstack(
     ctx: click.Context,
     provider: str,
     stack_name: str,
@@ -1709,6 +1908,13 @@ def deploy(
         region: The region to deploy the stack to.
         interactive: Deploy the stack interactively.
     """
+    cli_utils.warning(
+        "The `zenml stack deploy-mlstack` (former `zenml stack deploy`) CLI "
+        "command has been deprecated and will be removed in a future release. "
+        "Please use `zenml stack deploy` instead for a simplified "
+        "experience."
+    )
+
     with track_handler(
         event=AnalyticsEvent.DEPLOY_STACK,
     ) as analytics_handler:
