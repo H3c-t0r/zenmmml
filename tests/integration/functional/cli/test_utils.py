@@ -11,11 +11,16 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 #  or implied. See the License for the specific language governing
 #  permissions and limitations under the License.
+import os
+from typing import Tuple
+from unittest.mock import patch
+
 import pytest
 from click import ClickException
 
 from zenml import __version__ as current_zenml_version
 from zenml.cli import utils as cli_utils
+from zenml.cli.utils import requires_mac_env_var_warning
 
 
 def test_error_raises_exception():
@@ -115,3 +120,51 @@ def test_validate_keys():
     with pytest.raises(ClickException):
         cli_utils.validate_keys("")
     assert cli_utils.validate_keys("abcd") is None
+
+
+@pytest.mark.parametrize(
+    "mac_version, env_var, expected_result",
+    [
+        (("10", "15", ""), "", True),
+        (("10", "15", ""), "1", False),
+        (("10", "13", ""), "", True),
+        (("10", "13", ""), "1", False),
+        (("10", "12", ""), "", False),
+        (("10", "12", ""), "1", False),
+        ((), "", False),
+        ((), "1", False),
+    ],
+)
+def test_requires_mac_env_var_warning(
+    mac_version: Tuple[str, ...], env_var: str, expected_result: bool
+) -> None:
+    """Test the requires_mac_env_var_warning function.
+
+    Args:
+        mac_version: A tuple representing the mocked macOS version.
+        env_var: The value of the `OBJC_DISABLE_INITIALIZE_FORK_SAFETY` environment variable.
+        expected_result: The expected result of the requires_mac_env_var_warning function.
+    """
+    original_env_var = os.environ.get("OBJC_DISABLE_INITIALIZE_FORK_SAFETY")
+
+    with patch(
+        "platform.mac_ver", return_value=(mac_version, ("", "", ""), "")
+    ):
+        if "OBJC_DISABLE_INITIALIZE_FORK_SAFETY" in os.environ:
+            del os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"]
+
+        if env_var:
+            os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = env_var
+
+        assert requires_mac_env_var_warning() == expected_result
+
+    if original_env_var is not None:
+        os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = original_env_var
+    elif "OBJC_DISABLE_INITIALIZE_FORK_SAFETY" in os.environ:
+        del os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"]
+
+
+def test_requires_mac_env_var_warning_non_mac() -> None:
+    """Test the requires_mac_env_var_warning function on a non-macOS platform."""
+    with patch("sys.platform", "linux"):
+        assert not requires_mac_env_var_warning()

@@ -2751,29 +2751,36 @@ def is_jupyter_installed() -> bool:
         return False
 
 
-def requires_mac_env_var_warning() -> bool:
-    """Checks if a warning needs to be shown for a local Mac server.
+def get_macos_version() -> Tuple[Optional[int], Optional[int]]:
+    """Get the macOS version as a tuple of (major, minor) version numbers.
 
-    This is for the case where a user is on a MacOS system, trying to run a
+    Returns:
+        A tuple of (major, minor) version numbers if running on macOS, or (None, None) otherwise.
+    """
+    if sys.platform == "darwin":
+        mac_version = platform.mac_ver()[0]
+        if mac_version:
+            try:
+                major, minor, _ = mac_version
+                return int(major), int(minor)
+            except (ValueError, TypeError):
+                pass
+    return None, None
+
+
+def requires_mac_env_var_warning() -> bool:
+    """Check if a warning needs to be shown for a local Mac server.
+
+    This is for the case where a user is on a macOS system, trying to run a
     local server but is missing the `OBJC_DISABLE_INITIALIZE_FORK_SAFETY`
     environment variable.
 
     Returns:
-        bool: True if a warning needs to be shown, False otherwise.
+        True if a warning needs to be shown, False otherwise.
     """
-    if mac_version := platform.mac_ver()[0]:
-        try:
-            major, minor, _ = mac_version.split(".")
-            mac_version_tuple = (int(major), int(minor))
-        except (ValueError, IndexError):
-            # If the version string is not in the expected format,
-            # assume the warning should be shown
-            return True
-    else:
-        mac_version_tuple = (0, 0)
-
-    return (
-        not os.getenv("OBJC_DISABLE_INITIALIZE_FORK_SAFETY")
-        and sys.platform == "darwin"
-        and mac_version_tuple >= (10, 13)
-    )
+    major, minor = get_macos_version()
+    if major is not None and minor is not None:
+        return not os.getenv("OBJC_DISABLE_INITIALIZE_FORK_SAFETY") and (
+            major > 10 or (major == 10 and minor >= 13)
+        )
+    return False
